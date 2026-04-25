@@ -1,0 +1,328 @@
+import java.io.*;
+import java.util.*;
+
+// -------------------- Expense Class --------------------
+class Expense implements Serializable {
+    private double amount;
+    private String category;
+    private String date;
+
+    public Expense(double amount, String category, String date) {
+        this.amount = amount;
+        this.category = category;
+        this.date = date;
+    }
+
+    public double getAmount() { return amount; }
+    public String getCategory() { return category; }
+    public String getDate() { return date; }
+
+    public void setAmount(double amount) { this.amount = amount; }
+    public void setCategory(String category) { this.category = category; }
+
+    @Override
+    public String toString() {
+        return "Amount: " + amount + ", Category: " + category + ", Date: " + date;
+    }
+}
+
+// -------------------- User Class --------------------
+class User implements Serializable {
+    private String username;
+    private String password;
+    private double budget;
+    private ArrayList<Expense> expenses;
+
+    public User(String username, String password, double budget) {
+        this.username = username;
+        this.password = password;
+        this.budget = budget;
+        this.expenses = new ArrayList<>();
+    }
+
+    public String getUsername() { return username; }
+    public boolean checkPassword(String pass) { return password.equals(pass); }
+    public double getBudget() { return budget; }
+    public ArrayList<Expense> getExpenses() { return expenses; }
+
+    public void addExpense(Expense e) { expenses.add(e); }
+
+    public void showExpenses() {
+        if (expenses.isEmpty()) {
+            System.out.println("No expenses recorded.");
+            return;
+        }
+        for (int i = 0; i < expenses.size(); i++) {
+            System.out.println(i + ". " + expenses.get(i));
+        }
+    }
+
+    // -------- EDIT EXPENSE --------
+    public void editExpense(int index, double amount, String category) {
+        if (index >= 0 && index < expenses.size()) {
+            expenses.get(index).setAmount(amount);
+            expenses.get(index).setCategory(category);
+        } else {
+            System.out.println("Invalid index.");
+        }
+    }
+
+    // -------- DELETE EXPENSE --------
+    public void deleteExpense(int index) {
+        if (index >= 0 && index < expenses.size()) {
+            expenses.remove(index);
+            System.out.println("Expense deleted.");
+        } else {
+            System.out.println("Invalid index.");
+        }
+    }
+
+    // -------- SEARCH --------
+    public ArrayList<Expense> searchByCategory(String cat) {
+        ArrayList<Expense> result = new ArrayList<>();
+        for (Expense e : expenses) {
+            if (e.getCategory().equalsIgnoreCase(cat)) result.add(e);
+        }
+        return result;
+    }
+
+    public double getTotalSpending() {
+        double total = 0;
+        for (Expense e : expenses) total += e.getAmount();
+        return total;
+    }
+
+    // -------- CATEGORY SUMMARY (sorted by amount descending) --------
+    public void categorySummary() {
+        if (expenses.isEmpty()) {
+            System.out.println("No data to summarize.");
+            return;
+        }
+        HashMap<String, Double> map = getCategorySummary();
+
+        List<Map.Entry<String, Double>> sortedEntries = new ArrayList<>(map.entrySet());
+        sortedEntries.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+
+        System.out.println("\n--- Current Spending Summary (Sorted by Amount) ---");
+        for (Map.Entry<String, Double> entry : sortedEntries) {
+            System.out.printf("%-12s: PKR %.2f\n", entry.getKey(), entry.getValue());
+        }
+    }
+
+    // -------- BUDGET CHECK --------
+    public String checkBudget() {
+        double spent = getTotalSpending();
+        if (spent > budget) return "EXCEEDED";
+        if (spent > budget * 0.8) return "WARNING";
+        return "OK";
+    }
+
+    // -------- SORT --------
+    public void sortExpenses() {
+        expenses.sort(Comparator.comparingDouble(Expense::getAmount));
+        System.out.println("Expenses sorted by amount.");
+    }
+
+    // -------- NO-SPEND STREAK --------
+    public int noSpendStreak() {
+        HashSet<String> days = new HashSet<>();
+        for (Expense e : expenses) days.add(e.getDate());
+        return Math.max(0, 30 - days.size());
+    }
+
+    // -------- PREDICTION --------
+    public double predictSpending() {
+        if (expenses.isEmpty()) return 0;
+        double avg = getTotalSpending() / expenses.size();
+        return avg * 30;
+    }
+
+    public int getNoSpendDays() {
+        HashSet<String> dates = new HashSet<>();
+        for (Expense e : expenses) dates.add(e.getDate());
+        return Math.max(0, 30 - dates.size());
+    }
+
+    public String getPrediction() {
+        if (expenses.isEmpty()) return "No expenses yet to predict from.";
+        double avg = getTotalSpending() / expenses.size();
+        double predicted = avg * 30;
+        String r = "Predicted Monthly Spending: PKR " + String.format("%.2f", predicted);
+        if (predicted > budget) r += " - May exceed budget!";
+        return r;
+    }
+
+    public String getBudgetStatus() {
+        double spent = getTotalSpending();
+        if (spent > budget) return "BUDGET EXCEEDED! Spent: PKR " + String.format("%.2f", spent);
+        else if (spent > budget * 0.8) return "WARNING: 80%+ used. Spent: PKR " + String.format("%.2f", spent);
+        else return "Remaining: PKR " + String.format("%.2f", budget - spent);
+    }
+
+    public HashMap<String, Double> getCategorySummary() {
+        HashMap<String, Double> map = new HashMap<>();
+        for (Expense e : expenses)
+            map.put(e.getCategory(), map.getOrDefault(e.getCategory(), 0.0) + e.getAmount());
+        return map;
+    }
+
+    // -------- SMART MONTHLY PLANNER (29-Day Logic) --------
+    public void generateMonthlyPlan() {
+        HashSet<String> uniqueDays = new HashSet<>();
+        for (Expense e : expenses) uniqueDays.add(e.getDate());
+
+        if (uniqueDays.size() < 29) {
+            System.out.println("\n[!] PLAN BLOCKED: Insufficient Data.");
+            System.out.println("You have tracked " + uniqueDays.size() + " unique days.");
+            System.out.println("You need at least 29 different days of expenses to unlock the Smart Plan.");
+            return;
+        }
+
+        HashMap<String, Double> categoryTotals = getCategorySummary();
+        double totalSpent = getTotalSpending();
+
+        List<Map.Entry<String, Double>> sortedEntries = new ArrayList<>(categoryTotals.entrySet());
+        sortedEntries.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+
+        System.out.println("\n=== SMART MONTHLY PLAN FOR NEXT MONTH ===");
+        System.out.println("Based on 29+ days of analysis. Target Budget: PKR " + budget);
+        
+
+        for (Map.Entry<String, Double> entry : sortedEntries) {
+            double habitPercentage = entry.getValue() / totalSpent;
+            double recommendedLimit = habitPercentage * budget;
+            System.out.printf("Category: %-12s | Recommended Limit: PKR %.2f (%.1f%%)\n",
+                              entry.getKey(), recommendedLimit, habitPercentage * 100);
+        }
+    }
+}
+
+// -------------------- MAIN APP CLASS --------------------
+public class PennyPoint {
+    static ArrayList<User> users = new ArrayList<>();
+    static final String FILE_NAME = "users.dat";
+
+    public static void saveUsers() {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+            out.writeObject(users);
+        } catch (Exception e) { System.out.println("Error saving data."); }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static void loadUsers() {
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(FILE_NAME))) {
+            users = (ArrayList<User>) in.readObject();
+        } catch (Exception e) { /* Initial run */ }
+    }
+
+    public static User findUser(String username) {
+        for (User u : users) if (u.getUsername().equalsIgnoreCase(username)) return u;
+        return null;
+    }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        loadUsers();
+        User currentUser = null;
+
+        System.out.println("Welcome to PennyPoint!");
+
+        while (currentUser == null) {
+            System.out.println("\n1. Register  2. Login  3. Exit");
+            int choice = sc.nextInt(); sc.nextLine();
+
+            if (choice == 3) return;
+
+            System.out.print("Username: "); String u = sc.nextLine();
+            System.out.print("Password: "); String p = sc.nextLine();
+
+            if (choice == 1) {
+                if (findUser(u) != null) {
+                    System.out.println("Username taken!"); continue;
+                }
+                System.out.print("Set Monthly Budget Goal (PKR): "); double b = sc.nextDouble();
+                currentUser = new User(u, p, b);
+                users.add(currentUser);
+                saveUsers();
+                System.out.println("Registration successful!");
+            } else {
+                User user = findUser(u);
+                if (user != null && user.checkPassword(p)) currentUser = user;
+                else System.out.println("Invalid credentials.");
+            }
+        }
+
+        int menuChoice;
+        do {
+            System.out.println("\n--- MAIN MENU ---");
+            System.out.println("1. Add Expense");
+            System.out.println("2. Manage Expenses (Edit/Delete/Search/Sort)");
+            System.out.println("3. Category Summary");
+            System.out.println("4. Budget Status");
+            System.out.println("5. Prediction & No-Spend Days");
+            System.out.println("6. Smart Plan");
+            System.out.println("7. Save & Logout");
+            menuChoice = sc.nextInt(); sc.nextLine();
+
+            switch (menuChoice) {
+                case 1:
+                    System.out.print("Amount (PKR): "); double amt = sc.nextDouble(); sc.nextLine();
+                    System.out.print("Category: "); String cat = sc.nextLine();
+                    System.out.print("Date (dd/mm/yyyy): "); String date = sc.nextLine();
+                    currentUser.addExpense(new Expense(amt, cat, date));
+                    System.out.println("Expense added!");
+                    String status = currentUser.checkBudget();
+                    if (!status.equals("OK"))
+                        System.out.println("[Budget Alert] Status: " + status);
+                    break;
+
+                case 2:
+                    System.out.println("\n--- MANAGE EXPENSES ---");
+                    System.out.println("1. Edit  2. Delete  3. Search  4. Sort by Amount");
+                    int subChoice = sc.nextInt(); sc.nextLine();
+                    switch (subChoice) {
+                        case 1:
+                            currentUser.showExpenses();
+                            System.out.print("Enter index to edit: "); int editIdx = sc.nextInt(); sc.nextLine();
+                            System.out.print("New Amount (PKR): "); double newAmt = sc.nextDouble(); sc.nextLine();
+                            System.out.print("New Category: "); String newCat = sc.nextLine();
+                            currentUser.editExpense(editIdx, newAmt, newCat);
+                            System.out.println("Expense updated.");
+                            break;
+                        case 2:
+                            currentUser.showExpenses();
+                            System.out.print("Enter index to delete: "); int delIdx = sc.nextInt(); sc.nextLine();
+                            currentUser.deleteExpense(delIdx);
+                            break;
+                        case 3:
+                            System.out.print("Enter category to search: "); String searchCat = sc.nextLine();
+                            ArrayList<Expense> results = currentUser.searchByCategory(searchCat);
+                            if (results.isEmpty()) System.out.println("No expenses found for: " + searchCat);
+                            else results.forEach(System.out::println);
+                            break;
+                        case 4:
+                            currentUser.sortExpenses();
+                            currentUser.showExpenses();
+                            break;
+                    }
+                    break;
+
+                case 3: currentUser.categorySummary(); break;
+
+                case 4: System.out.println(currentUser.getBudgetStatus()); break;
+
+                case 5:
+                    System.out.println(currentUser.getPrediction());
+                    System.out.println("No-Spend Days this month: " + currentUser.getNoSpendDays());
+                    break;
+
+                case 6: currentUser.generateMonthlyPlan(); break;
+
+                case 7: saveUsers(); System.out.println("Logged out. Data saved."); break;
+
+                default: System.out.println("Invalid option.");
+            }
+        } while (menuChoice != 7);
+        sc.close();
+    }
+}
